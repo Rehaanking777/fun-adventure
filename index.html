@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Madam Ji’s Magical Adventure — Final</title>
+<style>
+  :root{--pink:#ff7db6;--blue:#6bc1ff;--purple:#a183ff;--orange:#ff9c66}
+  body{margin:0;font-family:Inter,Arial,Helvetica,sans-serif;background:linear-gradient(135deg,#fff6fb,#fff0f5);overflow:hidden}
+  .screen{width:100vw;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px;box-sizing:border-box;text-align:center}
+  button{background:var(--pink);border:none;color:#fff;padding:10px 18px;border-radius:12px;font-size:16px;cursor:pointer}
+  #rehaan{position:fixed;left:50%;top:18px;transform:translateX(-50%);min-width:360px;padding:14px 18px;border-radius:12px;background:var(--blue);color:white;font-weight:600;display:none;z-index:9999;text-align:center}
+  #rehaan.show{display:block;}
+  #heart{position:fixed;width:80px;height:80px;border-radius:14px;background:linear-gradient(135deg,#ff6b6b,#ffb6c1);display:none;cursor:pointer;z-index:900}
+  #memory div,#xoBoard div{width:120px;height:120px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:44px;background:#ffdfe8;cursor:pointer}
+  #xoBoard{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .confetti{position:fixed;width:10px;height:10px;border-radius:50%;opacity:0.95;pointer-events:none}
+  input[type="text"]{padding:10px;border-radius:10px;border:1px solid #e6a9c3;font-size:16px}
+  h1{margin:6px}
+</style>
+</head>
+<body>
+
+<!-- Screens -->
+<div id="intro" class="screen">
+  <h1>Welcome Madam Ji 💗</h1>
+  <p>Play the cute game — Rehaan is with you every step ✨</p>
+  <button id="startBtn">Start Adventure</button>
+</div>
+
+<div id="level1" class="screen" style="display:none">
+  <h1>Level 1 — Catch Your Heart 💘</h1>
+  <p>Catch the moving heart (Rehaan already caught it — he’ll help)</p>
+  <button id="beginLevel1" disabled>Begin Level 1</button>
+</div>
+
+<div id="level2" class="screen" style="display:none">
+  <h1>Level 2 — Memory Hearts 💞</h1>
+  <p>Find matching heart pairs</p>
+  <div id="memory" style="width:80%;max-width:900px;display:flex;flex-wrap:wrap;justify-content:center;gap:12px"></div>
+  <div style="margin-top:8px"><button id="hintBtn">Call Cinnamon Roll 🎀</button></div>
+</div>
+
+<div id="level3" class="screen" style="display:none">
+  <h1>Level 3 — Type "Cinnamon Roll" 🍪</h1>
+  <p>Type exactly: <b>Cinnamon Roll</b></p>
+  <input id="typeInput" type="text" placeholder="Type here" />
+  <div style="display:flex;gap:8px;margin-top:8px"><button id="submitType">Submit</button></div>
+</div>
+
+<div id="level4" class="screen" style="display:none">
+  <h1>Level 4 — XO Game ❌⭕</h1>
+  <p>You are X, Rehaan is O (computer). Win to unlock your special message!</p>
+  <div id="xoBoard" style="width:340px;max-width:90vw"></div>
+</div>
+
+<!-- Outro / Secret Message -->
+<div id="secret" class="screen" style="display:none;background:linear-gradient(135deg,#ffe0f0,#fff0f5);color:#ff6b6b">
+  <h1>Secret Message I Love the Most ✨</h1>
+  <p style="font-size:1.6rem;line-height:2rem;">💖 Rehaan: I love you infinitely, Madam Ji! You are my everything! ♾️</p>
+  <p style="margin-top:16px;font-size:1.2rem;">💌 Thank you for playing this little adventure with me 💌</p>
+</div>
+
+<div id="rehaan" aria-live="polite"></div>
+<div id="heart"></div>
+
+<script>
+window.onload = ()=>{
+  const DURATION = 5000;
+  const rehaanEl=document.getElementById('rehaan');
+  const startBtn=document.getElementById('startBtn');
+  const level1Screen=document.getElementById('level1');
+  const beginLevel1Btn=document.getElementById('beginLevel1');
+  const heart=document.getElementById('heart');
+  const memory=document.getElementById('memory');
+  const hintBtn=document.getElementById('hintBtn');
+  const typeInput=document.getElementById('typeInput');
+  const submitType=document.getElementById('submitType');
+  const xoBoard=document.getElementById('xoBoard');
+
+  let heartAnimId=null, heartMoving=false, heartFrozen=false;
+
+  async function showDialogue(text,duration=DURATION){
+    return new Promise(res=>{
+      rehaanEl.textContent=text;
+      rehaanEl.classList.add('show');
+      setTimeout(()=>{ rehaanEl.classList.remove('show'); res(); }, duration);
+    });
+  }
+
+  function confetti(){
+    for(let i=0;i<50;i++){
+      const c=document.createElement('div');
+      c.className='confetti';
+      c.style.left=Math.random()*100+'vw';
+      c.style.top='-5vh';
+      c.style.background=['#ff5c8a','#ffd166','#8be9b6','#ffc0cb','#9ad0f5','#a183ff','#ff9c66'][Math.floor(Math.random()*7)];
+      document.body.appendChild(c);
+      const fall=2000+Math.random()*1000;
+      c.animate([{transform:'translateY(0)',opacity:1},{transform:'translateY(90vh) rotate('+(Math.random()*720-360)+'deg)',opacity:0}],
+        {duration:fall,iterations:1,easing:'linear'});
+      setTimeout(()=>c.remove(),fall+50);
+    }
+  }
+
+  function hideAll(){ document.querySelectorAll('.screen').forEach(s=>s.style.display='none'); }
+  function clearHeartHandlers(){ heart.onclick=null; }
+  let heartClicked=false;
+
+  // --- Start Button ---
+  startBtn.addEventListener('click', async ()=>{
+    hideAll(); level1Screen.style.display='flex';
+    beginLevel1Btn.disabled=true;
+    await showDialogue('🤖 Robot: In this level you gotta catch the moving heart...');
+    await showDialogue('system: Rehaan grabs the robot mid-explanation! (boom)');
+    await showDialogue('*Rehaan beating robot*');
+    await showDialogue('Rehaan: No one can explain my Madam Ji! She is smart baddie!!');
+    beginLevel1Btn.disabled=false;
+  });
+
+  // --- Level 1 ---
+  beginLevel1Btn.addEventListener('click', ()=>{
+    heartClicked=false; clearHeartHandlers();
+    heart.style.display='block';
+    const w=window.innerWidth, h=window.innerHeight;
+    let x=w/2-40, y=h/2-40;
+    heart.style.left=x+'px'; heart.style.top=y+'px';
+    heartMoving=true; heartFrozen=false;
+    let target={x:x,y:y};
+
+    function step(){
+      if(!heartMoving) return;
+      const rect=heart.getBoundingClientRect();
+      const cx=rect.left, cy=rect.top;
+      const vx=(target.x-cx)*0.09, vy=(target.y-cy)*0.09;
+      heart.style.left=(cx+vx)+'px'; heart.style.top=(cy+vy)+'px';
+      if(Math.abs(target.x-cx)<8 && Math.abs(target.y-cy)<8){
+        target.x=Math.random()*(w-160)+80;
+        target.y=Math.random()*(h-300)+150;
+      }
+      heartAnimId=requestAnimationFrame(step);
+    }
+    cancelAnimationFrame(heartAnimId);
+    heartAnimId=requestAnimationFrame(step);
+
+    showDialogue('💗 Rehaan: u already have my heart, cutie! 💘');
+
+    heart.onclick=async ()=>{
+      if(heartClicked) return;
+      heartClicked=true;
+      heartMoving=false; cancelAnimationFrame(heartAnimId);
+      heart.style.display='none';
+      confetti();
+      goToLevel(2);
+    };
+  });
+
+  // --- Level 2 ---
+  function loadMemory(){
+    memory.innerHTML='';
+    const cards=['❤️','❤️','💗','💗','💝','💝','💖','💖'];
+    const pool=[...cards].sort(()=>Math.random()-0.5);
+    let first=null,matches=0,total=pool.length/2;
+    (async ()=>{
+      await showDialogue('🤖 Robot: In this level you gotta find matching heart emojis...');
+      await showDialogue(' Rehaan: Not again!!  *grab him!*');
+      await showDialogue('*Rehaan beating robot*');
+      await showDialogue('Rehaan: My Madam Ji is too smart for this!');
+    })();
+
+    pool.forEach(symbol=>{
+      const cell=document.createElement('div');
+      cell.textContent='?';
+      cell.dataset.symbol=symbol;
+      cell.addEventListener('click', ()=>{
+        if(cell.textContent!=='?') return;
+        cell.textContent=symbol;
+        if(!first) first=cell;
+        else{
+          if(first.textContent===cell.textContent){ matches++; first=null; 
+            if(matches===total){ confetti(); awaitThen(()=>showDialogue('💗 Rehaan: I like you more!').then(()=>setTimeout(()=>goToLevel(3),1000))); }
+          }else{ setTimeout(()=>{ first.textContent='?'; cell.textContent='?'; first=null; },600); }
+        }
+      });
+      memory.appendChild(cell);
+    });
+  }
+
+  function awaitThen(fn){ try{ fn(); }catch(e){console.error(e);} }
+
+  hintBtn.addEventListener('click', ()=>{
+    const cells=Array.from(memory.children).filter(c=>c.textContent==='?');
+    if(cells.length<2) return;
+    const idx=Math.floor(Math.random()*cells.length);
+    const a=cells[idx];
+    let b=cells.find(c=>c!==a); if(!b)b=cells[(idx+1)%cells.length];
+    const symA=a.dataset.symbol||'❤️', symB=b.dataset.symbol||'❤️';
+    a.textContent=symA; b.textContent=symB;
+    setTimeout(()=>{ if(a)a.textContent='?'; if(b)b.textContent='?'; },1200);
+    showDialogue('💗 Rehaan: Here is a tiny hint, Madam Ji.');
+  });
+
+  // --- Level 3 ---
+  let attemptCount=0;
+  async function robotIntroLevel3(){
+    await showDialogue('🤖 Robot: In this level, you gotta type "Cinnamon Roll" correctly...');
+    await showDialogue('😋 Rehaan grabs the robot mid‑explain!');
+    await showDialogue('*Rehaan beating robot*');
+    await showDialogue('Rehaan: No one explains to my Madam Ji! She is smart baddie!!');
+    attemptCount=0; enableTypingRound();
+  }
+
+  function enableTypingRound(){
+    typeInput.value=''; typeInput.focus();
+    let timer=setTimeout(async ()=>{
+      attemptCount++; await showDialogue('🤖 Robot: Try again!');
+      await showDialogue('🧸 Rehaan: HOW DARE YOU SAY TRY AGAIN TO MY MADAM JI!');
+      if(attemptCount>=2){ await showDialogue('💖 Rehaan: I broke the timer — take your time, cutie'); }
+      else setTimeout(enableTypingRound,1000);
+    },5000);
+
+    const onSubmit=async ()=>{
+      clearTimeout(timer);
+      const val=typeInput.value.trim().toLowerCase();
+      if(val==='cinnamon roll'){ confetti(); await showDialogue('💗 Rehaan: I love you!'); goToLevel(4); }
+      else{
+        attemptCount++;
+        await showDialogue('🤖 Robot: Try again!');
+        await showDialogue('🧸 Rehaan: HOW DARE YOU SAY TRY AGAIN TO MY MADAM JI!');
+        if(attemptCount>=2){ await showDialogue('💖 Rehaan: I broke the timer — take your time, cutie'); }
+        else setTimeout(enableTypingRound,500);
+      }
+    };
+    submitType.onclick=onSubmit;
+    typeInput.addEventListener('keydown',(e)=>{ if(e.key==='Enter') onSubmit(); },{once:false});
+  }
+
+  // --- Level 4 ---
+  function loadXO(){
+    xoBoard.innerHTML=''; const cells=Array(9).fill('');
+    function checkWin(arr){ const w=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]]; return w.some(p=>arr[p[0]]&&arr[p[0]]===arr[p[1]]&&arr[p[1]]===arr[p[2]]); }
+    function computerMove(){ const empty=cells.map((v,i)=>v===''?i:null).filter(x=>x!==null); if(empty.length===0) return; const pick=empty[Math.floor(Math.random()*empty.length)]; cells[pick]='O'; xoBoard.children[pick].textContent='O'; if(checkWin(cells)){ confetti(); awaitThen(()=>showDialogue('💖 Rehaan: Secret message unlocked!').then(()=>setTimeout(()=>goToLevel('secret'),1500))); } }
+    for(let i=0;i<9;i++){ const b=document.createElement('div'); b.addEventListener('click',()=>{
+      if(cells[i]!=='') return; cells[i]='X'; b.textContent='X'; if(checkWin(cells)){ confetti(); awaitThen(()=>showDialogue('💗 Rehaan: I love you the most!').then(()=>setTimeout(()=>goToLevel('secret'),1500))); return; } setTimeout(computerMove,500);
+    }); xoBoard.appendChild(b); }
+  }
+
+  function goToLevel(n){
+    hideAll();
+    if(n===2){ document.getElementById('level2').style.display='flex'; loadMemory(); }
+    if(n===3){ document.getElementById('level3').style.display='flex'; robotIntroLevel3(); }
+    if(n===4){ document.getElementById('level4').style.display='flex'; loadXO(); }
+    if(n==='secret'){ document.getElementById('secret').style.display='flex'; confetti(); showDialogue('💖 Rehaan: I love you infinitely, Madam Ji!'); }
+  }
+};
+</script>
+</body>
+</html>
